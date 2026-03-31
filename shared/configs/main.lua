@@ -1,6 +1,6 @@
 Config = {
 
-    defaultlang = 'en_lang',
+    defaultlang = 'de_lang',
     ---------------------------------------------------------------
 
     devMode = {
@@ -24,7 +24,7 @@ Config = {
     -- SS-Metabolism                = 13
     -- bcc-corehud                  = 14
     -- cas-metabolism               = 15
-    app = 1,
+    app = 12,
     ---------------------------------------------------------------
 
     keys = {
@@ -74,9 +74,9 @@ Config = {
     -- Sickness from Drinking Wild Water (Player Dies if Duration or Health Reaches 0)
     sickness = {
         chance   = 25,  -- Range 1 - 100 (lower Number = lower Chance) / Set to 0 to Disable
-        duration = 600, -- Default: 600 / Death Timer in Seconds 
+        duration = 1200, -- Default: 600 / Death Timer in Seconds 
         interval = 15,  -- Default: 15 / Time in Seconds Between each Health Loss
-        health   = 50,  -- Default: 50 / Health lost per Interval
+        health   = 5,  -- Default: 50 / Health lost per Interval
     },
     ---------------------------------------------------------------
 
@@ -108,7 +108,7 @@ Config = {
     ---------------------------------------------------------------
 
     durability = {
-        canteen = 5, -- Durability used per Drink
+        canteen = 1, -- Durability used per Drink
     },
     ---------------------------------------------------------------
 
