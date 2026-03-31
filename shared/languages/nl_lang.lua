@@ -11,6 +11,7 @@ Locales["nl_lang"] = {
     needBucket = "Je hebt niet genoeg lege emmers!",
     needBottle = "Je hebt niet genoeg lege flessen!",
     waterPump = "Waterpomp",
+    wildWater = "Wild water",
     Durability = "Duurzaamheid",
     brokeCanteen = "Je veldflessen is kapotgegaan!",
     drinksLeft = "Drankjes over",

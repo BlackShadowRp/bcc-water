@@ -11,6 +11,7 @@ Locales["ptbr_lang"] = {
     needBucket = "Você não tem baldes vazios suficientes!",
     needBottle = "Você não tem garrafas vazias suficientes!",
     waterPump = "Bomba de Água",
+    wildWater = "Água selvagem",
     Durability = "Durabilidade",
     brokeCanteen = "Seu cantil quebrou!",
     drinksLeft = "Bebidas restantes",

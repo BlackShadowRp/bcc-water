@@ -11,6 +11,7 @@ Locales["ro_lang"] = {
     needBucket = "Nu ai destule galeti goale!",
     needBottle = "Nu ai destule sticle goale!",
     waterPump = "Pompa de Apa",
+    wildWater = "Apa salbatica",
     Durability = "Durabilitate",
     brokeCanteen = "Plosca ta s-a spart!",
     drinksLeft = "Bauturi ramase",

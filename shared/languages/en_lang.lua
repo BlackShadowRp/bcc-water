@@ -11,6 +11,7 @@ Locales["en_lang"] = {
     needBucket = "You don't have enough empty buckets!",
     needBottle = "You don't have enough empty bottles!",
     waterPump = "Water Pump",
+    wildWater = "Wild Water",
     Durability = "Durability",
     brokeCanteen = "Your canteen has broken!",
     drinksLeft = "Drinks Left",

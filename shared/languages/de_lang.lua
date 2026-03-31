@@ -11,6 +11,7 @@ Locales["de_lang"] = {
     needBucket = "Du hast nicht genug leere Eimer!",
     needBottle = "Du hast nicht genug leere Flaschen!",
     waterPump = "Wasserpumpe",
+    wildWater = "Wildes Wasser",
     Durability = "Haltbarkeit",
     brokeCanteen = "Deine Feldflasche ist kaputtgegangen!",
     drinksLeft = "Verbleibende Getränke",
