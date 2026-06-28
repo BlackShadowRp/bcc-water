@@ -24,7 +24,7 @@ Config = {
     -- SS-Metabolism                = 13
     -- bcc-corehud                  = 14
     -- cas-metabolism               = 15
-    app = 1,
+    app = 12,
     ---------------------------------------------------------------
 
     keys = {
@@ -84,7 +84,12 @@ Config = {
     autoSeedDatabase = true,
 
     -- Item Names from Database
-    canteen      = 'canteen',
+    canteen      = 'canteen', -- Backwards-compatible default canteen item.
+    canteens     = {          -- Additional items behave exactly like Config.canteen.
+        'canteen',
+        'canteen_native',
+        -- 'canteen_military',
+    },
 
     emptyBucket  = 'wateringcan_empty',
     cleanBucket  = 'wateringcan',
@@ -93,6 +98,18 @@ Config = {
     emptyBottle  = 'bcc_empty_bottle',
     cleanBottle  = 'bcc_clean_bottle',
     dirtyBottle  = 'bcc_dirty_bottle',
+    bottleTypes  = { -- Pump water fills clean, wild water fills dirty when Config.wild.dirtyItems is true.
+        {
+            empty = 'bcc_empty_bottle',
+            clean = 'bcc_clean_bottle',
+            dirty = 'bcc_dirty_bottle',
+        },
+        {
+            empty = 'tonflasche',
+            clean = 'tonflasche_frischwasser',
+            dirty = 'tonflasche_wasser',
+        },
+    },
 
     antidoteItem = 'antidote', -- Item name that cures sickness
     ---------------------------------------------------------------
@@ -109,6 +126,10 @@ Config = {
 
     durability = {
         canteen = 1, -- Durability used per Drink
+        canteens = {
+            -- canteen_native = 1,
+            -- canteen_military = 1,
+        }
     },
     ---------------------------------------------------------------
 
@@ -136,7 +157,7 @@ Config = {
     canteenDrink = {
         health  = 10, -- Default: 10 / Value is 0 - 100 / Set to 0 to Disable
         stamina = 20, -- Default: 20 / Value is 0 - 100 / Set to 0 to Disable
-        thirst  = 50  -- Default: 50 / Value is 0 - 100
+        thirst  = 12  -- Default: 50 / Value is 0 - 100
     },
 
     -- Effects Drinking from Wild Waters
@@ -145,7 +166,7 @@ Config = {
         health      = 5,    -- Default: 5 / Value is 0 - 100 / Set to 0 to Disable
         gainStamina = true, -- true = Gain Stamina by stamina Value / false = Lose by Value
         stamina     = 10,   -- Default: 10 / Value is 0 - 100 / Set to 0 to Disable
-        thirst      = 25    -- Default: 25 / Value is 0 - 100
+        thirst      = 10    -- Default: 25 / Value is 0 - 100
     },
     ---------------------------------------------------------------
 
