@@ -191,10 +191,10 @@ function BucketFill(pumpAnim)
     DBG:Info('Bucket filled successfully.')
 end
 
-RegisterNetEvent('bcc-water:UseCanteen', function()
+RegisterNetEvent('bcc-water:UseCanteen', function(itemName, itemId)
     DBG:Info('Using canteen.')
     if CanUseCanteen then
-        local result = Core.Callback.TriggerAwait('bcc-water:UpdateCanteen')
+        local result = Core.Callback.TriggerAwait('bcc-water:UpdateCanteen', itemName, itemId)
         if not result then return end
 
         DrinkCanteen()

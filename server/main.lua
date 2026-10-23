@@ -1,6 +1,108 @@
 local MaxCanteenDrinks = Config.maxCanteenDrinks
 local SickPlayers = {}
 
+local function getConfiguredCanteenItems()
+    local items = {}
+    local seen = {}
+
+    local function addItem(itemName)
+        if type(itemName) ~= 'string' or itemName == '' or seen[itemName] then
+            return
+        end
+
+        seen[itemName] = true
+        items[#items + 1] = itemName
+    end
+
+    if type(Config.canteens) == 'table' then
+        for _, itemName in ipairs(Config.canteens) do
+            addItem(itemName)
+        end
+    end
+
+    addItem(Config.canteen)
+    return items
+end
+
+local function isConfiguredCanteenItem(itemName)
+    for _, configuredItemName in ipairs(getConfiguredCanteenItems()) do
+        if configuredItemName == itemName then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function getCanteenUsage(itemName)
+    local perItemUsage = Config.durability and Config.durability.canteens
+    if type(perItemUsage) == 'table' and tonumber(perItemUsage[itemName]) then
+        return tonumber(perItemUsage[itemName])
+    end
+
+    return tonumber(Config.durability and Config.durability.canteen) or 1
+end
+
+local function isCanteenFull(canteen)
+    local meta = canteen and canteen.metadata
+    return type(meta) == 'table' and tonumber(meta.drinksLeft) and tonumber(meta.drinksLeft) >= MaxCanteenDrinks
+end
+
+local function getInventoryItemById(src, itemId)
+    local ok, item = pcall(function()
+        return exports.vorp_inventory:getItemById(src, itemId)
+    end)
+
+    if ok then
+        return item
+    end
+
+    DBG:Warning(string.format('getItemById failed for source=%d id=%s: %s', src, tostring(itemId), tostring(item)))
+    return nil
+end
+
+local function findCanteen(src, preferredItemName, preferredItemId, requireFillable)
+    preferredItemId = tonumber(preferredItemId)
+    if preferredItemId and preferredItemId > 0 then
+        local canteen = getInventoryItemById(src, preferredItemId)
+        if canteen and isConfiguredCanteenItem(canteen.name) and (not requireFillable or not isCanteenFull(canteen)) then
+            return canteen, canteen.name
+        end
+    end
+
+    if preferredItemName and isConfiguredCanteenItem(preferredItemName) then
+        local canteen = exports.vorp_inventory:getItem(src, preferredItemName)
+        if canteen and (not requireFillable or not isCanteenFull(canteen)) then
+            return canteen, preferredItemName
+        end
+    end
+
+    local foundFullCanteen = false
+    for _, itemName in ipairs(getConfiguredCanteenItems()) do
+        local canteen = exports.vorp_inventory:getItem(src, itemName)
+        if canteen then
+            if not requireFillable or not isCanteenFull(canteen) then
+                return canteen, itemName
+            end
+            foundFullCanteen = true
+        end
+    end
+
+    if foundFullCanteen then
+        return nil, nil, 'full'
+    end
+
+    return nil, nil, 'missing'
+end
+
+exports('IsSickByCharId', function(charid)
+    charid = tonumber(charid) or 0
+    if charid <= 0 then
+        return false
+    end
+    return SickPlayers[charid] == true
+end)
+
 ---@param src number
 ---@param canteenId number
 ---@param drinksLeft number
@@ -27,16 +129,15 @@ Core.Callback.Register('bcc-water:GetCanteenLevel', function(source, cb)
         DBG:Error(string.format('User not found for source: %d', src))
         return cb(false)
     end
-    local itemCanteen = Config.canteen
-    local canteen = exports.vorp_inventory:getItem(src, itemCanteen)
+    local canteen, _, reason = findCanteen(src, nil, nil, true)
     -- Check if the canteen exists in the inventory
     if not canteen then
-        Core.NotifyRightTip(src, _U('needCanteen'), 4000)
-        DBG:Warning(string.format('Canteen not found for source: %d', src))
+        Core.NotifyRightTip(src, reason == 'full' and _U('fullCanteen') or _U('needCanteen'), 4000)
+        DBG:Warning(string.format('Fillable canteen not found for source: %d reason=%s', src, tostring(reason)))
         return cb(false)
     end
-    local meta = canteen['metadata']
-    local isNewCanteen = next(meta) == nil
+    local meta = canteen['metadata'] or {}
+    local isNewCanteen = type(meta) ~= 'table' or next(meta) == nil
     -- Fill the canteen if it's new or not full
     if isNewCanteen then
         updateCanteenMetadata(src, canteen.id, MaxCanteenDrinks, 100)
@@ -57,7 +158,7 @@ Core.Callback.Register('bcc-water:GetCanteenLevel', function(source, cb)
 end)
 
 -- Manage Drinking from Canteen
-Core.Callback.Register('bcc-water:UpdateCanteen', function(source, cb)
+Core.Callback.Register('bcc-water:UpdateCanteen', function(source, cb, itemName, itemId)
     local src = source
     local user = Core.getUser(src)
     -- Check if the user exists
@@ -65,12 +166,16 @@ Core.Callback.Register('bcc-water:UpdateCanteen', function(source, cb)
         DBG:Error(string.format('User not found for source: %d', src))
         return cb(false)
     end
-    local itemCanteen = Config.canteen
-    local canteen = exports.vorp_inventory:getItem(src, itemCanteen)
-    local meta = canteen['metadata']
+    local canteen, canteenItemName = findCanteen(src, itemName, itemId, false)
+    if not canteen then
+        Core.NotifyRightTip(src, _U('needCanteen'), 4000)
+        DBG:Warning(string.format('Canteen not found for source: %d item=%s id=%s', src, tostring(itemName), tostring(itemId)))
+        return cb(false)
+    end
+    local meta = canteen['metadata'] or {}
     local drinksLeft = meta.drinksLeft
     local durability = meta.durability
-    local canteenUsage = Config.durability.canteen
+    local canteenUsage = getCanteenUsage(canteenItemName)
     local newDurability = durability and durability - canteenUsage or 100
     -- Decrement drinks left and update durability
     if drinksLeft and drinksLeft > 0 then
@@ -165,23 +270,31 @@ Core.Callback.Register('bcc-water:GetItem', function(source, cb, itemType, itemA
     cb(true)
 end)
 
--- Register the canteen as a usable item
-exports.vorp_inventory:registerUsableItem(Config.canteen, function(data)
-    local src = data.source
-    exports.vorp_inventory:closeInventory(src)
-    local itemCanteen = Config.canteen
-    local canteen = exports.vorp_inventory:getItem(src, itemCanteen)
-    local meta = canteen['metadata']
-    local durability = meta.durability
-    local canteenUsage = Config.durability.canteen
-    -- Check if the canteen can be used
-    if durability == nil or durability >= canteenUsage then
-        TriggerClientEvent('bcc-water:UseCanteen', src)
-        DBG:Info(string.format('Canteen used by source: %d', src))
-    else
-        DBG:Warning(string.format('Canteen cannot be used by source: %d', src))
-    end
-end)
+-- Register configured canteen items as usable items
+for _, canteenItemName in ipairs(getConfiguredCanteenItems()) do
+    exports.vorp_inventory:registerUsableItem(canteenItemName, function(data)
+        local src = data.source
+        local itemId = data.item and data.item.id
+        exports.vorp_inventory:closeInventory(src)
+        local canteen = itemId and getInventoryItemById(src, itemId) or exports.vorp_inventory:getItem(src, canteenItemName)
+        if not canteen then
+            Core.NotifyRightTip(src, _U('needCanteen'), 4000)
+            DBG:Warning(string.format('Canteen not found during usable callback: source=%d item=%s id=%s', src, canteenItemName, tostring(itemId)))
+            return
+        end
+
+        local meta = canteen['metadata'] or {}
+        local durability = meta.durability
+        local canteenUsage = getCanteenUsage(canteenItemName)
+        -- Check if the canteen can be used
+        if durability == nil or durability >= canteenUsage then
+            TriggerClientEvent('bcc-water:UseCanteen', src, canteenItemName, itemId)
+            DBG:Info(string.format('Canteen used by source: %d item=%s id=%s', src, canteenItemName, tostring(itemId)))
+        else
+            DBG:Warning(string.format('Canteen cannot be used by source: %d item=%s id=%s', src, canteenItemName, tostring(itemId)))
+        end
+    end)
+end
 
 -- Clean Bottle (no sickness)
 if Config.useable.cleanBottle then
