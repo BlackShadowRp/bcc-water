@@ -46,7 +46,7 @@ Config = {
         drink   = true,       -- Allow Player to Drink
         multi   = {
             bottles = true,   -- Allow to Fill Multiple Bottles at Once
-            bottleAmount = 5, -- Maximum Amount of Bottles to Fill at Once
+            bottleAmount = 10, -- Maximum Amount of Bottles to Fill at Once
             buckets = true,   -- Allow to Fill Multiple Buckets at Once
             bucketAmount = 5  -- Maximum Amount of Buckets to Fill at Once
         }
@@ -64,7 +64,7 @@ Config = {
         dirtyItems  = true,       -- Set to false to receive clean bottles/buckets from wild water instead of dirty ones
         multi   = {
             bottles = true,   -- Allow to Fill Multiple Bottles at Once
-            bottleAmount = 5, -- Maximum Amount of Bottles to Fill at Once
+            bottleAmount = 10, -- Maximum Amount of Bottles to Fill at Once
             buckets = true,   -- Allow to Fill Multiple Buckets at Once
             bucketAmount = 5  -- Maximum Amount of Buckets to Fill at Once
         }
