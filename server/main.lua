@@ -24,6 +24,80 @@ local function getConfiguredCanteenItems()
     return items
 end
 
+local function addBottleType(types, seen, bottleType)
+    if type(bottleType) ~= 'table' then
+        return
+    end
+
+    local emptyBottle = bottleType.empty or bottleType.emptyBottle
+    local cleanBottle = bottleType.clean or bottleType.cleanBottle
+    local dirtyBottle = bottleType.dirty or bottleType.dirtyBottle
+    if type(emptyBottle) ~= 'string' or emptyBottle == ''
+        or type(cleanBottle) ~= 'string' or cleanBottle == ''
+        or type(dirtyBottle) ~= 'string' or dirtyBottle == '' then
+        return
+    end
+
+    local key = emptyBottle .. '|' .. cleanBottle .. '|' .. dirtyBottle
+    if seen[key] then
+        return
+    end
+
+    seen[key] = true
+    types[#types + 1] = {
+        empty = emptyBottle,
+        clean = cleanBottle,
+        dirty = dirtyBottle
+    }
+end
+
+local function getConfiguredBottleTypes()
+    local bottleTypes = {}
+    local seen = {}
+
+    if type(Config.bottleTypes) == 'table' then
+        for _, bottleType in ipairs(Config.bottleTypes) do
+            addBottleType(bottleTypes, seen, bottleType)
+        end
+    end
+
+    addBottleType(bottleTypes, seen, {
+        empty = Config.emptyBottle,
+        clean = Config.cleanBottle,
+        dirty = Config.dirtyBottle
+    })
+
+    return bottleTypes
+end
+
+local function getInventoryCount(src, itemName)
+    local item = exports.vorp_inventory:getItem(src, itemName)
+    return math.max(0, math.floor(tonumber(item and item.count) or 0))
+end
+
+local function buildBottleFillPlan(src, itemAmount)
+    local remaining = math.max(1, math.floor(tonumber(itemAmount) or 1))
+    local plan = {}
+
+    for _, bottleType in ipairs(getConfiguredBottleTypes()) do
+        local available = getInventoryCount(src, bottleType.empty)
+        local amount = math.min(available, remaining)
+        if amount > 0 then
+            plan[#plan + 1] = {
+                bottleType = bottleType,
+                amount = amount
+            }
+            remaining = remaining - amount
+        end
+
+        if remaining <= 0 then
+            return plan
+        end
+    end
+
+    return nil
+end
+
 local function isConfiguredCanteenItem(itemName)
     for _, configuredItemName in ipairs(getConfiguredCanteenItems()) do
         if configuredItemName == itemName then
@@ -242,30 +316,47 @@ Core.Callback.Register('bcc-water:GetItem', function(source, cb, itemType, itemA
         DBG:Error(string.format('User not found for source: %d', src))
         return cb(false)
     end
-    -- Set empty item and notifications based on item type
-    local emptyItem = itemType == 'bucket' and Config.emptyBucket or Config.emptyBottle
-    local notification = itemType == 'bucket' and _U('needBucket') or _U('needBottle')
-    -- Check if the player has the required item
-    local item = exports.vorp_inventory:getItem(src, emptyItem)
-    if not item or item.count < itemAmount then
-        Core.NotifyRightTip(src, notification, 4000)
-        DBG:Warning(string.format('Source %d does not have the required item: %s', src, emptyItem))
+
+    itemAmount = math.max(1, math.floor(tonumber(itemAmount) or 1))
+    local sourceType = pump and 'pump' or 'wild'
+    local wildDirty = not pump and Config.wild.dirtyItems
+
+    if itemType == 'bottle' then
+        local fillPlan = buildBottleFillPlan(src, itemAmount)
+        if not fillPlan then
+            Core.NotifyRightTip(src, _U('needBottle'), 4000)
+            DBG:Warning(string.format('Source %d does not have enough configured empty bottles for amount: %d', src, itemAmount))
+            return cb(false)
+        end
+
+        for _, entry in ipairs(fillPlan) do
+            exports.vorp_inventory:subItem(src, entry.bottleType.empty, entry.amount)
+        end
+
+        for _, entry in ipairs(fillPlan) do
+            local itemName = (pump or not wildDirty) and entry.bottleType.clean or entry.bottleType.dirty
+            for i = 1, entry.amount do
+                exports.vorp_inventory:addItem(src, itemName, 1, { source = sourceType })
+                DBG:Info(string.format('Added bottle item to source %d: %s, Empty: %s, Pump: %s, WildDirty: %s', src, itemName, entry.bottleType.empty, tostring(pump), tostring(wildDirty)))
+            end
+        end
+
+        return cb(true)
+    end
+
+    local item = exports.vorp_inventory:getItem(src, Config.emptyBucket)
+    local bucketCount = tonumber(item and item.count) or 0
+    if bucketCount < itemAmount then
+        Core.NotifyRightTip(src, _U('needBucket'), 4000)
+        DBG:Warning(string.format('Source %d does not have the required item: %s', src, Config.emptyBucket))
         return cb(false)
     end
-    -- Remove empty items
-    exports.vorp_inventory:subItem(src, emptyItem, itemAmount)
+
+    exports.vorp_inventory:subItem(src, Config.emptyBucket, itemAmount)
+    local itemName = (pump or not wildDirty) and Config.cleanBucket or Config.dirtyBucket
     for i = 1, itemAmount do
-        local sourceType = pump and 'pump' or 'wild'
-        local wildDirty  = not pump and Config.wild.dirtyItems
-        if itemType == 'bottle' then
-            local itemName = (pump or not wildDirty) and Config.cleanBottle or Config.dirtyBottle
-            exports.vorp_inventory:addItem(src, itemName, 1, { source = sourceType })
-            DBG:Info(string.format('Added item to source %d: %s, Pump: %s, WildDirty: %s', src, itemName, tostring(pump), tostring(wildDirty)))
-        elseif itemType == 'bucket' then
-            local itemName = (pump or not wildDirty) and Config.cleanBucket or Config.dirtyBucket
-            exports.vorp_inventory:addItem(src, itemName, 1, { source = sourceType })
-            DBG:Info(string.format('Added item to source %d: %s, Pump: %s, WildDirty: %s', src, itemName, tostring(pump), tostring(wildDirty)))
-        end
+        exports.vorp_inventory:addItem(src, itemName, 1, { source = sourceType })
+        DBG:Info(string.format('Added item to source %d: %s, Pump: %s, WildDirty: %s', src, itemName, tostring(pump), tostring(wildDirty)))
     end
     cb(true)
 end)
@@ -296,34 +387,41 @@ for _, canteenItemName in ipairs(getConfiguredCanteenItems()) do
     end)
 end
 
--- Clean Bottle (no sickness)
-if Config.useable.cleanBottle then
-    DBG:Info('Registering clean bottle as usable item')
-    exports.vorp_inventory:registerUsableItem(Config.cleanBottle, function(data)
+local registeredBottleItems = {}
+
+local function registerBottleUsableItem(itemName, emptyBottle, isDirty)
+    if type(itemName) ~= 'string' or itemName == '' or registeredBottleItems[itemName] then
+        return
+    end
+
+    registeredBottleItems[itemName] = true
+    DBG:Info(string.format('Registering bottle as usable item: item=%s empty=%s dirty=%s', itemName, emptyBottle, tostring(isDirty)))
+    exports.vorp_inventory:registerUsableItem(itemName, function(data)
         local src = data.source
-        local emptyBottle = Config.emptyBottle
+        local itemId = data.item and data.item.id
         exports.vorp_inventory:closeInventory(src)
-        exports.vorp_inventory:subItemById(src, data.item.id)
+
+        if itemId then
+            exports.vorp_inventory:subItemById(src, itemId)
+        else
+            exports.vorp_inventory:subItem(src, itemName, 1)
+        end
+
         if exports.vorp_inventory:canCarryItem(src, emptyBottle, 1) then
             exports.vorp_inventory:addItem(src, emptyBottle, 1)
         end
-        TriggerClientEvent('bcc-water:DrinkBottle', src, false)
+
+        TriggerClientEvent('bcc-water:DrinkBottle', src, isDirty)
     end)
 end
 
--- Dirty Bottle (sickness chance)
-if Config.useable.dirtyBottle then
-    DBG:Info('Registering dirty bottle as usable item')
-    exports.vorp_inventory:registerUsableItem(Config.dirtyBottle, function(data)
-        local src = data.source
-        local emptyBottle = Config.emptyBottle
-        exports.vorp_inventory:closeInventory(src)
-        exports.vorp_inventory:subItemById(src, data.item.id)
-        if exports.vorp_inventory:canCarryItem(src, emptyBottle, 1) then
-            exports.vorp_inventory:addItem(src, emptyBottle, 1)
-        end
-        TriggerClientEvent('bcc-water:DrinkBottle', src, true)
-    end)
+for _, bottleType in ipairs(getConfiguredBottleTypes()) do
+    if Config.useable.cleanBottle then
+        registerBottleUsableItem(bottleType.clean, bottleType.empty, false)
+    end
+    if Config.useable.dirtyBottle then
+        registerBottleUsableItem(bottleType.dirty, bottleType.empty, true)
+    end
 end
 
 if Config.useable.antidoteItem then

@@ -98,6 +98,18 @@ Config = {
     emptyBottle  = 'bcc_empty_bottle',
     cleanBottle  = 'bcc_clean_bottle',
     dirtyBottle  = 'bcc_dirty_bottle',
+    bottleTypes  = { -- Pump water fills clean, wild water fills dirty when Config.wild.dirtyItems is true.
+        {
+            empty = 'bcc_empty_bottle',
+            clean = 'bcc_clean_bottle',
+            dirty = 'bcc_dirty_bottle',
+        },
+        {
+            empty = 'tonflasche',
+            clean = 'tonflasche_frischwasser',
+            dirty = 'tonflasche_wasser',
+        },
+    },
 
     antidoteItem = 'antidote', -- Item name that cures sickness
     ---------------------------------------------------------------
