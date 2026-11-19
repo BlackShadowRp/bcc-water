@@ -238,3 +238,6 @@ Do not remove, replace, or change the container again in the calling script. `bc
 Inspired by `green_canteen` and maintained by the BCC Team.
 
 Repository: [BryceCanyonCounty/bcc-water](https://github.com/BryceCanyonCounty/bcc-water)
+
+## BS-Betrieb
+Farming leert eine ganze Kanne, die Goldwäsche verbraucht eine von fünf Portionen. Rezepte zählen ganze Flaschen. Trinkschlauch und Tonflaschen sind integriert. Die Aufbereitung erfolgt im Kontextmenü mit einer Aufbereitungstablette aus dem Gemischtwarenladen (Grundpreis 0,05 Dollar). Lokale Schnittstellen und Konfiguration stehen in UPGRADE_NOTES.md.

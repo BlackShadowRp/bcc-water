@@ -18,8 +18,8 @@ local MetabolismApps <const> = {
 
 Config = {
     -- General
-    defaultlang = 'en_lang', -- Locale file to use.
-    autoSeedDatabase = true, -- Automatically add the included inventory items to the database.
+    defaultlang = 'de_lang', -- Locale file to use.
+    autoSeedDatabase = false, -- Automatically add the included inventory items to the database.
     showMessages = true,     -- Show success and failure notifications to players.
     usePrompt = true,        -- Use RedM hold prompts; false uses floating key text.
 
@@ -30,7 +30,7 @@ Config = {
 
     -- Metabolism integration
     -- Select one entry from the MetabolismApps table above.
-    app = MetabolismApps.VORP, -- Metabolism or HUD integration used for drinking effects.
+    app = MetabolismApps.BLN_HUD, -- Metabolism or HUD integration used for drinking effects.
 
     -- Interaction controls
     keys = {
@@ -51,7 +51,7 @@ Config = {
         drink = true,         -- Allow players to drink directly from pumps.
         multi = {
             bottles = true,   -- Allow several bottles to be filled in one action.
-            bottleAmount = 5, -- Maximum bottles allowed per pump fill action.
+            bottleAmount = 10, -- Maximum bottles allowed per pump fill action.
             buckets = true,   -- Allow several buckets to be filled in one action.
             bucketAmount = 5, -- Maximum buckets allowed per pump fill action.
         },
@@ -68,7 +68,7 @@ Config = {
         dirtyItems = true,    -- Make wild-filled containers dirty; false makes them clean.
         multi = {
             bottles = true,   -- Allow several bottles to be filled in one action.
-            bottleAmount = 5, -- Maximum bottles allowed per wild-water fill action.
+            bottleAmount = 10, -- Maximum bottles allowed per wild-water fill action.
             buckets = true,   -- Allow several buckets to be filled in one action.
             bucketAmount = 5, -- Maximum buckets allowed per wild-water fill action.
         },
@@ -95,6 +95,12 @@ Config = {
     cleanBottle = 'bcc_clean_bottle',       -- Bottle containing clean water.
     dirtyBottle = 'bcc_dirty_bottle',       -- Bottle containing dirty water.
 
+    canteens = { 'canteen', 'canteen_native' },
+    bottleTypes = {
+        { empty = 'bcc_empty_bottle', clean = 'bcc_clean_bottle', dirty = 'bcc_dirty_bottle' },
+        { empty = 'tonflasche', clean = 'tonflasche_frischwasser', dirty = 'tonflasche_wasser' },
+    },
+
     antidoteItems = {
         'antidote', -- Inventory item that cures water sickness.
         -- 'strong_antidote',                         -- Add more valid antidote item names here.
@@ -108,8 +114,8 @@ Config = {
     useable = {
         cleanBottle = true, -- Register clean bottles as usable inventory items.
         dirtyBottle = true, -- Register dirty bottles as usable inventory items.
-        cleanBucket = true, -- Register clean buckets as usable inventory items.
-        dirtyBucket = true, -- Register dirty buckets as usable inventory items.
+        cleanBucket = false, -- Register clean buckets as usable inventory items.
+        dirtyBucket = false, -- Register dirty buckets as usable inventory items.
         antidotes = true,   -- Register every configured antidote as usable.
     },
 
@@ -121,7 +127,7 @@ Config = {
             bottle = 100,  -- Starting durability for bottles without durability metadata.
         },
         usage = {
-            canteen = 5, -- Canteen durability removed per drink.
+            canteen = 1, -- Canteen durability removed per drink.
             bucket = 5,  -- Bucket durability removed per water use.
             bottle = 5,  -- Bottle durability removed per drink.
         },
@@ -151,7 +157,7 @@ Config = {
         methods = {
             tablets = {
                 enabled = true,                                   -- Enable this purification method.
-                label = 'Use Purification Tablet',                -- Inventory context-menu button text.
+                label = 'Wasser mit Tablette aufbereiten',                -- Inventory context-menu button text.
                 requiredItems = {
                     { name = 'purification_tablet', amount = 1 }, -- Item and quantity consumed.
                 },
@@ -162,9 +168,9 @@ Config = {
     -- Dirty-water sickness. Reaching zero health or the duration limit is fatal.
     sickness = {
         chance = 25,    -- Sickness chance from dirty water, from 0 to 100.
-        duration = 600, -- Seconds before untreated sickness becomes fatal.
+        duration = 3600, -- Seconds before untreated sickness becomes fatal.
         interval = 15,  -- Seconds between sickness damage ticks.
-        health = 50,    -- Health removed on each sickness tick.
+        health = 5,     -- Health removed on each sickness tick.
     },
 
     -- Washing and soap
@@ -180,7 +186,7 @@ Config = {
     canteenDrink = {
         health = 10,  -- Health gained from clean container or pump water; 0 disables.
         stamina = 20, -- Stamina gained from clean container or pump water; 0 disables.
-        thirst = 50,  -- Thirst restored through the selected metabolism system.
+        thirst = 12,  -- Thirst restored through the selected metabolism system.
     },
 
     wildDrink = {
@@ -188,6 +194,6 @@ Config = {
         health = 5,         -- Health changed by dirty or direct wild-water drinking.
         gainStamina = true, -- true adds stamina; false removes it.
         stamina = 10,       -- Stamina changed by dirty or direct wild-water drinking.
-        thirst = 25,        -- Thirst restored by dirty or direct wild-water drinking.
+        thirst = 10,        -- Thirst restored by dirty or direct wild-water drinking.
     },
 }

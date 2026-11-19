@@ -3,13 +3,7 @@ local SEED_VERSION = 4
 local UPSERT_SQL = [[
 INSERT INTO `items` (`item`, `label`, `limit`, `can_remove`, `type`, `usable`, `desc`)
 VALUES (?, ?, ?, ?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE
-  `label` = VALUES(`label`),
-  `limit` = VALUES(`limit`),
-  `can_remove` = VALUES(`can_remove`),
-  `type` = VALUES(`type`),
-  `usable` = VALUES(`usable`),
-  `desc` = VALUES(`desc`);
+ON DUPLICATE KEY UPDATE `item` = VALUES(`item`);
 ]]
 
 local CREATE_MIGRATIONS_SQL = [[
@@ -75,7 +69,7 @@ local function buildItems()
     local tabletMethod = Config.purification.methods.tablets
     local tabletRequirement = tabletMethod and tabletMethod.requiredItems
         and tabletMethod.requiredItems[1]
-    add(tabletRequirement and tabletRequirement.name, 'Purification Tablet', 20, false,
+    add(tabletRequirement and tabletRequirement.name, 'Aufbereitungstablette', 20, true,
         'Purifies one container of dirty water.')
 
     return items

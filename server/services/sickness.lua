@@ -114,6 +114,12 @@ local function useAntidoteOnPlayer(providerSource, patientSource, itemId, expect
 end
 
 -- Server-only integrations for doctor, medic, and treatment resources.
+exports('IsSickByCharId', function(charId)
+    local id = tonumber(charId)
+    if not id then return false end
+    return (sickPlayers[id] or sickPlayers[tostring(id)] or 0) > os.time()
+end)
+
 exports('IsPlayerSick', isPlayerSick)
 exports('UseAntidoteOnPlayer', function(providerSource, patientSource, itemId)
     ---@diagnostic disable-next-line: redundant-return-value -- Server exports support multiple Lua returns.

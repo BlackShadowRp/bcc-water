@@ -8,6 +8,20 @@ local getItemInstance = WaterInventory.getItemInstance
 local removeOneItemById = WaterInventory.removeOneItemById
 local addInventoryItem = WaterInventory.addItem
 
+local bottleFamily, canteenNames = {}, {}
+for _, family in ipairs(Config.bottleTypes) do
+    for _, name in pairs(family) do bottleFamily[name] = family end
+end
+for _, name in ipairs(Config.canteens) do canteenNames[name] = true end
+
+local function findBottle(src)
+    for _, family in ipairs(Config.bottleTypes) do
+        local item = exports.vorp_inventory:getItem(src, family.clean)
+            or exports.vorp_inventory:getItem(src, family.dirty)
+        if item then return item end
+    end
+end
+
 ---@return table|nil
 local function purificationContext()
     if not Config.purification.enabled then
@@ -66,32 +80,22 @@ end
 ---@param item table
 ---@param itemType string
 ---@return boolean
-local function consumeContainerUnlocked(item, itemType)
+local function consumeContainerUnlocked(item, itemType, whole)
     local usableItem, src, itemId = usableItemData(item)
     if not usableItem or not src or not itemId then
         DBG:Error('Cannot consume container: usable-item data is required')
         return false
     end
 
-    local emptyItem
-    local cleanItem
-    local dirtyItem
-
-    if itemType == 'bucket' then
-        emptyItem = Config.emptyBucket
-        cleanItem = Config.cleanBucket
-        dirtyItem = Config.dirtyBucket
-    elseif itemType == 'bottle' then
-        emptyItem = Config.emptyBottle
-        cleanItem = Config.cleanBottle
-        dirtyItem = Config.dirtyBottle
-    else
-        DBG:Error(string.format('Cannot consume container: invalid type %s', tostring(itemType)))
-        return false
-    end
-
     local currentItem = getItemInstance(src, itemId)
-    if not currentItem then
+    if not currentItem then return false end
+    local family = bottleFamily[currentItem.name]
+    local emptyItem, cleanItem, dirtyItem
+    if itemType == 'bucket' then
+        emptyItem, cleanItem, dirtyItem = Config.emptyBucket, Config.cleanBucket, Config.dirtyBucket
+    elseif itemType == 'bottle' and family then
+        emptyItem, cleanItem, dirtyItem = family.empty, family.clean, family.dirty
+    else
         return false
     end
 
@@ -114,7 +118,7 @@ local function consumeContainerUnlocked(item, itemType)
     end
 
     local newDurability = math.max(0, durability - durabilityUsage)
-    local newUsesLeft = math.max(0, usesLeft - 1)
+    local newUsesLeft = whole and 0 or math.max(0, usesLeft - 1)
 
     if durabilityUsage > 0 and newDurability < durabilityUsage then
         if not removeOneItemById(src, currentItem.id) then
@@ -135,7 +139,7 @@ local function consumeContainerUnlocked(item, itemType)
         metadata.source = currentItem.metadata and currentItem.metadata.source
         metadata.context = currentItem.metadata and currentItem.metadata.context
         setContainerDescription(metadata, itemType,
-            currentItem.metadata and currentItem.metadata.waterType or 'clean')
+            (currentItem.name == dirtyItem and 'dirty' or 'clean'))
 
         local updated = exports.vorp_inventory:setItemMetadata(src, currentItem.id, metadata, 1)
         if not updated then
@@ -170,7 +174,7 @@ local function consumeContainerUnlocked(item, itemType)
     return true
 end
 
-local function consumeContainerData(item, itemType)
+local function consumeContainerData(item, itemType, whole)
     local _, src, itemId = usableItemData(item)
     if not src or not itemId then
         return false
@@ -181,7 +185,7 @@ local function consumeContainerData(item, itemType)
     end
 
     local consumed = withItemLock(src, itemId, function()
-        return consumeContainerUnlocked(item, itemType)
+        return consumeContainerUnlocked(item, itemType, whole)
     end)
     if consumed then
         startUseCooldown(src, itemType)
@@ -193,7 +197,7 @@ end
 ---@param itemType 'bucket'|'bottle'
 ---@param itemId? number|string
 ---@return boolean
-local function consumeContainer(playerSource, itemType, itemId)
+local function consumeContainer(playerSource, itemType, itemId, whole)
     local src = tonumber(playerSource)
     if not src or not Core.getUser(src) then
         return false
@@ -219,8 +223,7 @@ local function consumeContainer(playerSource, itemType, itemId)
         container = exports.vorp_inventory:getItem(src, Config.cleanBucket)
             or exports.vorp_inventory:getItem(src, Config.dirtyBucket)
     else
-        container = exports.vorp_inventory:getItem(src, Config.cleanBottle)
-            or exports.vorp_inventory:getItem(src, Config.dirtyBottle)
+        container = findBottle(src)
     end
 
     if not container then
@@ -230,7 +233,7 @@ local function consumeContainer(playerSource, itemType, itemId)
     return consumeContainerData({
         source = src,
         item = container,
-    }, itemType)
+    }, itemType, whole == true)
 end
 
 ---@param playerSource number|string
@@ -259,8 +262,7 @@ local function hasContainer(playerSource, itemType, itemId)
         container = exports.vorp_inventory:getItem(src, Config.cleanBucket)
             or exports.vorp_inventory:getItem(src, Config.dirtyBucket)
     else
-        container = exports.vorp_inventory:getItem(src, Config.cleanBottle)
-            or exports.vorp_inventory:getItem(src, Config.dirtyBottle)
+        container = findBottle(src)
     end
 
     if not container then
@@ -269,6 +271,8 @@ local function hasContainer(playerSource, itemType, itemId)
 
     local cleanItem = itemType == 'bucket' and Config.cleanBucket or Config.cleanBottle
     local dirtyItem = itemType == 'bucket' and Config.dirtyBucket or Config.dirtyBottle
+    local family = bottleFamily[container.name]
+    if itemType == 'bottle' and family then cleanItem, dirtyItem = family.clean, family.dirty end
     if container.name ~= cleanItem and container.name ~= dirtyItem then
         return false
     end
@@ -375,9 +379,9 @@ if Config.purification.enabled then
             return false
         end
 
-        local isDirtyContainer = target.name == Config.dirtyBottle
+        local isDirtyContainer = (bottleFamily[target.name] and target.name == bottleFamily[target.name].dirty)
             or target.name == Config.dirtyBucket
-            or (target.name == Config.canteen and target.metadata
+            or (canteenNames[target.name] and target.metadata
                 and target.metadata.waterType == 'dirty')
         if not isDirtyContainer then
             return false
@@ -416,13 +420,13 @@ if Config.purification.enabled then
 
         local itemType
         local cleanItem
-        if target.name == Config.dirtyBottle then
+        if (bottleFamily[target.name] and target.name == bottleFamily[target.name].dirty) then
             itemType = 'bottle'
-            cleanItem = Config.cleanBottle
+            cleanItem = bottleFamily[target.name].clean
         elseif target.name == Config.dirtyBucket then
             itemType = 'bucket'
             cleanItem = Config.cleanBucket
-        elseif target.name == Config.canteen and target.metadata
+        elseif canteenNames[target.name] and target.metadata
                 and target.metadata.waterType == 'dirty' then
             itemType = 'canteen'
         else
@@ -507,6 +511,22 @@ if Config.purification.enabled then
         end
     end
 
+    -- Old dirty inventory stacks predate context metadata. Using a tablet adds
+    -- the action to those stacks so the player can choose the exact container.
+    exports.vorp_inventory:registerUsableItem('purification_tablet', function(data)
+        local src = data.source
+        for _, item in ipairs(exports.vorp_inventory:getUserInventoryItems(src) or {}) do
+            local family = bottleFamily[item.name]
+            local meta = item.metadata or {}
+            if (item.name == Config.dirtyBucket or (family and item.name == family.dirty)
+                    or (canteenNames[item.name] and meta.waterType == 'dirty')) and not meta.context then
+                meta.context = purificationContext()
+                exports.vorp_inventory:setItemMetadata(src, item.id, meta, item.count)
+            end
+        end
+        Core.NotifyRightTip(src, 'Wähle am Schmutzwasserbehälter „Wasser mit Tablette aufbereiten“.', 5000)
+    end, GetCurrentResourceName())
+
     RegisterNetEvent('bcc-water:CompletePurification', function(methodName, itemId)
         local src = source
         local pending = pendingPurifications[src]
@@ -552,7 +572,7 @@ local function useCanteen(data)
     end
 
     local canteen = itemId and getItemInstance(src, itemId) or nil
-    if not canteen or canteen.name ~= Config.canteen then
+    if not canteen or not canteenNames[canteen.name] then
         DBG:Warning(string.format('Refused invalid canteen %s for source %d', tostring(itemId), src))
         return false
     end
@@ -605,12 +625,18 @@ Core.Callback.Register('bcc-water:GetCanteenLevel', function(source, cb, pump)
         DBG:Error(string.format('User not found for source: %d', src))
         return cb(false)
     end
-    local itemCanteen = Config.canteen
-    local canteen = exports.vorp_inventory:getItem(src, itemCanteen)
-
+    local canteen, found
+    for _, item in ipairs(exports.vorp_inventory:getUserInventoryItems(src) or {}) do
+        if canteenNames[item.name] then
+            found = true
+            if (tonumber(item.metadata and item.metadata.drinksLeft) or 0) < MaxCanteenDrinks then
+                canteen = item
+                break
+            end
+        end
+    end
     if not canteen then
-        Core.NotifyRightTip(src, _U('needCanteen'), 4000)
-        DBG:Warning(string.format('Canteen not found for source: %d', src))
+        Core.NotifyRightTip(src, _U(found and 'fullCanteen' or 'needCanteen'), 4000)
         return cb(false)
     end
     local meta = canteen.metadata or {}
@@ -687,6 +713,12 @@ Core.Callback.Register('bcc-water:GetItem', function(source, cb, itemType, itemA
     -- Empty containers may be split into several stacks because their durability
     -- metadata differs. Count every matching stack before starting a multi-fill.
     local availableCount = tonumber(exports.vorp_inventory:getItemCount(src, nil, emptyItem)) or 0
+    if itemType == 'bottle' then
+        availableCount = 0
+        for _, family in ipairs(Config.bottleTypes) do
+            availableCount = availableCount + (tonumber(exports.vorp_inventory:getItemCount(src, nil, family.empty)) or 0)
+        end
+    end
     if availableCount < itemAmount then
         Core.NotifyRightTip(src, notification, 4000)
         DBG:Warning(string.format('Source %d needs %d %s but only has %d',
@@ -697,7 +729,18 @@ Core.Callback.Register('bcc-water:GetItem', function(source, cb, itemType, itemA
     for i = 1, itemAmount do
         -- Convert each container individually so its durability follows it.
         -- Removing by name in bulk loses the metadata belonging to each item.
-        local emptyContainer = exports.vorp_inventory:getItem(src, emptyItem)
+        local emptyContainer, family
+        if itemType == 'bottle' then
+            for _, candidate in ipairs(Config.bottleTypes) do
+                emptyContainer = exports.vorp_inventory:getItem(src, candidate.empty)
+                if emptyContainer then
+                    family, emptyItem = candidate, candidate.empty
+                    break
+                end
+            end
+        else
+            emptyContainer = exports.vorp_inventory:getItem(src, emptyItem)
+        end
         if not emptyContainer then
             DBG:Error(string.format('Empty container disappeared during fill for source %d: %s', src, emptyItem))
             return cb(false)
@@ -715,7 +758,7 @@ Core.Callback.Register('bcc-water:GetItem', function(source, cb, itemType, itemA
         end
 
         if itemType == 'bottle' then
-            local itemName = (pump or not wildDirty) and Config.cleanBottle or Config.dirtyBottle
+            local itemName = (pump or not wildDirty) and family.clean or family.dirty
             if not addInventoryItem(src, itemName, metadata) then
                 addInventoryItem(src, emptyItem, emptyContainer.metadata)
                 return cb(false)
@@ -733,7 +776,7 @@ Core.Callback.Register('bcc-water:GetItem', function(source, cb, itemType, itemA
     cb(true)
 end)
 
-exports.vorp_inventory:registerUsableItem(Config.canteen, function(data)
+local function drinkCanteen(data)
     local src = data.source
     exports.vorp_inventory:closeInventory(src)
 
@@ -753,30 +796,23 @@ exports.vorp_inventory:registerUsableItem(Config.canteen, function(data)
         startUseCooldown(src, 'canteen')
         TriggerClientEvent('bcc-water:UseCanteen', src, dirty)
     end
-end, GetCurrentResourceName())
-
-if Config.useable.cleanBottle then
-    DBG:Info('Registering clean bottle as usable item')
-    exports.vorp_inventory:registerUsableItem(Config.cleanBottle, function(data)
-        local src = data.source
-        exports.vorp_inventory:closeInventory(src)
-        if not consumeContainerData(data, 'bottle') then
-            return
-        end
-        TriggerClientEvent('bcc-water:DrinkBottle', src, false)
-    end, GetCurrentResourceName())
 end
 
-if Config.useable.dirtyBottle then
-    DBG:Info('Registering dirty bottle as usable item')
-    exports.vorp_inventory:registerUsableItem(Config.dirtyBottle, function(data)
-        local src = data.source
-        exports.vorp_inventory:closeInventory(src)
-        if not consumeContainerData(data, 'bottle') then
-            return
+for _, name in ipairs(Config.canteens) do
+    exports.vorp_inventory:registerUsableItem(name, drinkCanteen, GetCurrentResourceName())
+end
+
+local function registerBottle(name, dirty)
+    exports.vorp_inventory:registerUsableItem(name, function(data)
+        exports.vorp_inventory:closeInventory(data.source)
+        if consumeContainerData(data, 'bottle') then
+            TriggerClientEvent('bcc-water:DrinkBottle', data.source, dirty)
         end
-        TriggerClientEvent('bcc-water:DrinkBottle', src, true)
     end, GetCurrentResourceName())
+end
+for _, family in ipairs(Config.bottleTypes) do
+    if Config.useable.cleanBottle then registerBottle(family.clean, false) end
+    if Config.useable.dirtyBottle then registerBottle(family.dirty, true) end
 end
 
 if Config.useable.cleanBucket then
